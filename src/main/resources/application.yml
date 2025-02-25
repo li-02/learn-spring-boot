@@ -15,3 +15,7 @@ server:
   port: 8081
   servlet:
     context-path: /
+
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: true # 驼峰命名转换
