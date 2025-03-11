@@ -19,3 +19,16 @@ server:
 mybatis:
   configuration:
     map-underscore-to-camel-case: true # 驼峰命名转换
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  mapper-locations: classpath:mapper/*.xml
+
+logging:
+  file:
+    name: logs/application.log
+  level:
+    root: INFO
+    org.example: DEBUG
+  logback:
+    rolling policy:
+      max-file-size: 10MB
+      max-history: 7
