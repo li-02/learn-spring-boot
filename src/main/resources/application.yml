@@ -22,13 +22,22 @@ mybatis:
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
   mapper-locations: classpath:mapper/*.xml
 
+app:
+  logging:
+    enabled: true
+    log-request-params: true
+    log-response-body: true
+    controller-log-enabled: true
+    operation-log-enabled: true
+# 针对生产环境可以禁用部分详细日志
+# spring.profiles=prod
+# app.logging.log-response-body=false
 logging:
   file:
-    name: logs/application.log
-  level:
-    root: INFO
-    org.example: DEBUG
+    path: logs
   logback:
     rolling policy:
       max-file-size: 10MB
-      max-history: 7
+  level:
+    root: INFO
+    org.example: DEBUG
