@@ -1,13 +1,14 @@
 package org.example.aspect;
 
-import org.example.entity.LogInfo;
-import org.example.utils.LogUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.example.entity.LogInfo;
+import org.example.utils.LogUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
@@ -15,8 +16,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 @Aspect
 @Component
@@ -50,14 +51,14 @@ public class GlobalLogAspect {
         logInfo.setMethodName(method.getName());
 
         // 记录方法参数
-        logInfo.setRequestParams(point.getArgs());
+        logInfo.setRequestParams(Arrays.toString(point.getArgs()));
 
         try {
             // 执行目标方法
             Object result = point.proceed();
 
             // 记录响应结果
-            logInfo.setResponseData(result);
+            logInfo.setResponseData((String) result);
             logInfo.finish();
 
             // 记录日志

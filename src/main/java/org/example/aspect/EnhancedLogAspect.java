@@ -1,20 +1,21 @@
 package org.example.aspect;
 
-import org.example.annotation.LogOperation;
-import org.example.entity.LogInfo;
-import org.example.utils.LogUtil;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
+import org.example.annotation.LogOperation;
+import org.example.entity.LogInfo;
+import org.example.utils.LogUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
+import java.util.Arrays;
 
 @Aspect
 @Component
@@ -46,7 +47,7 @@ public class EnhancedLogAspect {
 
         // 是否记录请求参数
         if (logOperation.logParams()) {
-            logInfo.setRequestParams(point.getArgs());
+            logInfo.setRequestParams(Arrays.toString(point.getArgs()));
         }
 
         try {
@@ -55,7 +56,7 @@ public class EnhancedLogAspect {
 
             // 是否记录响应结果
             if (logOperation.logResult()) {
-                logInfo.setResponseData(result);
+                logInfo.setResponseData((String) result);
             }
 
             // 记录日志时间信息

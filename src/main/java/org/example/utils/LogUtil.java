@@ -1,14 +1,14 @@
 package org.example.utils;
 
-import org.example.entity.LogInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.HttpServletRequest;
+import org.example.entity.LogInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.util.UUID;
 
 public class LogUtil {
@@ -84,7 +84,7 @@ public class LogUtil {
         logInfo.setException(ex.getMessage());
         logInfo.finish();
 
-        log.error("【错误日志】" + message, ex);
+        log.error("【错误日志】{}", message, ex);
         logInfo(logInfo);
     }
 }

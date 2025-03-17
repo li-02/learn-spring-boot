@@ -160,3 +160,52 @@ AOP切面返回 → LoggingInterceptor → RequestLoggingFilter
 ```
 
 这个调用流程展示了混合日志策略的完整工作过程，从请求进入系统到响应返回客户端的每个阶段，都有相应的日志记录组件参与，确保了系统行为的可追踪性和可观测性。
+
+## 日志表
+
+```sql
+
+CREATE TABLE `sys_log`
+(
+    `id`             bigint      NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    `log_type`       varchar(50) NOT NULL COMMENT '日志类型：OPERATION-操作日志/ERROR-错误日志/SECURITY-安全日志/PERFORMANCE-性能日志',
+    `module`         varchar(100)         DEFAULT NULL COMMENT '模块名称',
+    `operation`      varchar(255)         DEFAULT NULL COMMENT '操作描述',
+    `request_id`     varchar(64)          DEFAULT NULL COMMENT '请求ID，用于追踪',
+    `user_id`        bigint               DEFAULT NULL COMMENT '操作用户ID',
+    `username`       varchar(100)         DEFAULT NULL COMMENT '操作用户名',
+    `ip_address`     varchar(50)          DEFAULT NULL COMMENT 'IP地址',
+    `user_agent`     varchar(500)         DEFAULT NULL COMMENT '用户代理信息',
+    `request_url`    varchar(500)         DEFAULT NULL COMMENT '请求URL',
+    `request_method` varchar(10)          DEFAULT NULL COMMENT '请求方法',
+    `request_params` text COMMENT '请求参数(JSON格式)',
+    `class_name`     varchar(255)         DEFAULT NULL COMMENT '类名',
+    `method_name`    varchar(100)         DEFAULT NULL COMMENT '方法名',
+    `response_code`  varchar(50)          DEFAULT NULL COMMENT '响应状态码',
+    `response_data`  text COMMENT '响应数据(JSON格式)',
+    `start_time`     datetime             DEFAULT NULL COMMENT '开始时间',
+    `end_time`       datetime             DEFAULT NULL COMMENT '结束时间',
+    `execution_time` bigint               DEFAULT NULL COMMENT '执行时间(毫秒)',
+    `exception`      text COMMENT '异常信息',
+    `device_info`    varchar(500)         DEFAULT NULL COMMENT '设备信息',
+    `created_at`     datetime    NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+    PRIMARY KEY (`id`),
+    KEY `idx_log_type` (`log_type`),
+    KEY `idx_user_id` (`user_id`),
+    KEY `idx_created_at` (`created_at`),
+    KEY `idx_module` (`module`),
+    KEY `idx_request_id` (`request_id`)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='系统日志表';
+
+```
+
+## 日志分类
+
+操作日志：记录用户的操作，如登录、增删改查等
+
+错误日志：记录系统异常和错误
+
+安全日志：记录与安全相关的事件，如权限变更、敏感操作等
+
+性能日志：记录系统性能指标，如响应时间、数据库查询时间等

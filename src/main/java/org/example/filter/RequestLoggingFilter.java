@@ -50,8 +50,8 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 
         // 初始化日志信息
         LogInfo logInfo = LogUtil.getLogInfo();
-        logInfo.setUrl(request.getRequestURI());
-        logInfo.setHttpMethod(request.getMethod());
+        logInfo.setRequestUrl(request.getRequestURI());
+        logInfo.setRequestMethod(request.getMethod());
         logInfo.setIpAddress(LogUtil.getClientIp());
 
         try {
