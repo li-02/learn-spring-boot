@@ -9,6 +9,9 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.time.format.DateTimeFormatter;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 
 public class LogUtil {
@@ -72,7 +75,32 @@ public class LogUtil {
     // 记录日志信息
     public static void logInfo(LogInfo logInfo) {
         try {
-            log.info("【操作日志】{}", objectMapper.writeValueAsString(logInfo));
+            // 创建一个不包含LocalDateTime的简单Map
+            Map<String, Object> logMap = new HashMap<>();
+            logMap.put("requestId", logInfo.getRequestId());
+            logMap.put("logType", logInfo.getLogType());
+            logMap.put("requestUrl", logInfo.getRequestUrl());
+            logMap.put("requestMethod", logInfo.getRequestMethod());
+            logMap.put("module", logInfo.getModule());
+            logMap.put("operation", logInfo.getOperation());
+            logMap.put("className", logInfo.getClassName());
+            logMap.put("methodName", logInfo.getMethodName());
+            logMap.put("requestParams", logInfo.getRequestParams());
+            logMap.put("responseData", logInfo.getResponseData());
+            logMap.put("responseCode", logInfo.getResponseCode());
+            logMap.put("userId", logInfo.getUserId());
+            logMap.put("username", logInfo.getUsername());
+            logMap.put("userAgent", logInfo.getUserAgent());
+            logMap.put("ipAddress", logInfo.getIpAddress());
+            logMap.put("startTime", logInfo.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            logMap.put("endTime", logInfo.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            logMap.put("executionTime", logInfo.getExecutionTime());
+            logMap.put("exception", logInfo.getException());
+            logMap.put("deviceInfo", logInfo.getDeviceInfo());
+            if (logInfo.getCreatedAt() != null) {
+                logMap.put("createdAt", logInfo.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
+            }
+            log.info("【操作日志】{}", objectMapper.writeValueAsString(logMap));
         } catch (Exception e) {
             log.error("日志序列化失败", e);
         }

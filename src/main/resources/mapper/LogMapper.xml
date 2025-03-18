@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="org.example.mapper.LogMapper">
+
+    <!-- 日志表字段映射 -->
+    <resultMap id="LogResultMap" type="org.example.entity.LogInfo">
+        <id property="id" column="id"/>
+        <result property="logType" column="log_type"/>
+        <result property="requestId" column="request_id"/>
+        <result property="requestUrl" column="request_url"/>
+        <result property="requestMethod" column="request_method"/>
+        <result property="module" column="module"/>
+        <result property="operation" column="operation"/>
+        <result property="className" column="class_name"/>
+        <result property="methodName" column="method_name"/>
+        <result property="requestParams" column="request_params"/>
+        <result property="responseData" column="response_data"/>
+        <result property="responseCode" column="response_code"/>
+        <result property="userId" column="user_id"/>
+        <result property="username" column="username"/>
+        <result property="userAgent" column="user_agent"/>
+        <result property="ipAddress" column="ip_address"/>
+        <result property="startTime" column="start_time"/>
+        <result property="endTime" column="end_time"/>
+        <result property="executionTime" column="execution_time"/>
+        <result property="exception" column="exception"/>
+        <result property="deviceInfo" column="device_info"/>
+        <result property="createdAt" column="created_at"/>
+    </resultMap>
+
+    <!-- 插入日志记录 -->
+    <insert id="insert" parameterType="org.example.entity.LogInfo">
+        INSERT INTO sys_log (log_type, request_id, request_url, request_method, module, operation,
+                             class_name, method_name, request_params, response_data, response_code,
+                             user_id, username, user_agent, ip_address, start_time, end_time,
+                             execution_time, exception, device_info, created_at)
+        VALUES (#{logType}, #{requestId}, #{requestUrl}, #{requestMethod}, #{module}, #{operation},
+                #{className}, #{methodName}, #{requestParams}, #{responseData}, #{responseCode},
+                #{userId}, #{username}, #{userAgent}, #{ipAddress}, #{startTime}, #{endTime},
+                #{executionTime}, #{exception}, #{deviceInfo}, #{createdAt})
+    </insert>
+
+    <!-- 按日志类型查询 -->
+    <select id="selectByLogType" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE log_type = #{logType}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按日期范围查询 -->
+    <select id="selectByDateRange" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE created_at BETWEEN #{startDate} AND #{endDate}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按类型和日期范围查询 -->
+    <select id="selectByTypeAndDateRange" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE log_type = #{logType}
+          AND created_at BETWEEN #{startDate} AND #{endDate}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按用户ID查询 -->
+    <select id="selectByUserId" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按模块查询 -->
+    <select id="selectByModule" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE module = #{module}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按请求ID查询 -->
+    <select id="selectByRequestId" resultMap="LogResultMap">
+        SELECT *
+        FROM sys_log
+        WHERE request_id = #{requestId}
+        ORDER BY created_at DESC
+    </select>
+</mapper>

@@ -3,6 +3,7 @@ package org.example.entity;
 import lombok.Data;
 
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 
 @Data
 public class LogInfo {
@@ -22,20 +23,22 @@ public class LogInfo {
     private String username;      // 用户名
     private String userAgent;   // 用户代理
     private String ipAddress;     // IP地址
-    private Long startTime;       // 开始时间
-    private Long endTime;         // 结束时间
+    private LocalDateTime startTime;       // 开始时间
+    private LocalDateTime endTime;         // 结束时间
     private Long executionTime;   // 执行时间(ms)
     private String exception;     // 异常信息
     private String deviceInfo;  // 用户设备信息
     private LocalDateTime createdAt;    // 创建时间
 
-    public LogInfo() {
-        this.startTime = System.currentTimeMillis();
+    // 修改finish方法
+    public void finish() {
+        this.endTime = LocalDateTime.now();
+        this.executionTime = ChronoUnit.MILLIS.between(this.startTime, this.endTime);
     }
 
-    public void finish() {
-        this.endTime = System.currentTimeMillis();
-        this.executionTime = this.endTime - this.startTime;
+    // 构造函数
+    public LogInfo() {
+        this.startTime = LocalDateTime.now();
     }
 
 }

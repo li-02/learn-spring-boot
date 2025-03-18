@@ -4,16 +4,20 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import org.example.entity.LogInfo;
 import org.example.utils.LogUtil;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StopWatch;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 // order 最高级别：会在其他过滤器之前执行
 
@@ -22,7 +26,12 @@ import java.io.IOException;
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
+@Data
+@Slf4j
 public class RequestLoggingFilter extends OncePerRequestFilter {
+    private boolean logRequestParams = true;
+    private boolean logResponseBody = true;
+    private int maxPayloadLength = 10000;
 
     /**
      * 实现过滤器的具体逻辑
@@ -36,8 +45,11 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
-        // 如果是资源文件，则跳过日志记录
-        if (isAssetRequest(request.getRequestURI())) {
+
+        // 如果是文件上传或者二进制内容，跳过记录
+        if (request.getContentType() != null &&
+                (request.getContentType().contains("multipart/form-data") ||
+                        request.getContentType().contains("application/octet-stream"))) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -50,25 +62,41 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
 
         // 初始化日志信息
         LogInfo logInfo = LogUtil.getLogInfo();
-        logInfo.setRequestUrl(request.getRequestURI());
-        logInfo.setRequestMethod(request.getMethod());
-        logInfo.setIpAddress(LogUtil.getClientIp());
+        StopWatch stopWatch = new StopWatch();
+        stopWatch.start();
 
         try {
             // 执行请求
             filterChain.doFilter(requestWrapper, responseWrapper);
         } finally {
-            // 仅当没有更详细的日志记录时，记录基本HTTP请求信息
-            if (logInfo.getClassName() == null) {
-                logInfo.finish();
-                LogUtil.logInfo(logInfo);
+            stopWatch.stop();
+            // 请求完成后，记录请求和响应信息
+            if (logRequestParams && requestWrapper.getContentAsByteArray().length > 0) {
+                String requestBody = new String(requestWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
+                if (requestBody.length() > maxPayloadLength) {
+                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
+                }
+                logInfo.setRequestParams(requestBody);
             }
-
-            // 清理线程本地变量
-            LogUtil.clearLogInfo();
-
+            if (logResponseBody && responseWrapper.getContentAsByteArray().length > 0) {
+                String requestBody = new String(responseWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
+                if (requestBody.length() > maxPayloadLength) {
+                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
+                }
+                logInfo.setResponseData(requestBody);
+            }
             // 复制响应内容（重要步骤！） 确保相应内容被写入到响应中
             responseWrapper.copyBodyToResponse();
+
+            // 这里我们不记录日志，因为后续的AOP切面会处理，除非没有匹配的切面
+            // 没有后续切面处理（比如静态资源请求），就在这里记录日志
+            String uri = request.getRequestURI();
+            if (isAssetRequest(uri)) {
+                if (log.isDebugEnabled()) {
+                    log.debug("Static resource request: {}", uri);
+                }
+                LogUtil.clearLogInfo();
+            }
         }
     }
 
