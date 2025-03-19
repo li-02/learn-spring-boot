@@ -1,7 +1,6 @@
 package org.example.aspect;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
@@ -22,7 +21,6 @@ import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.lang.reflect.Method;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 
 @Aspect
@@ -44,6 +42,8 @@ public class GlobalLogAspect {
 
     @Around("controllerPointcut()")
     public Object around(ProceedingJoinPoint point) throws Throwable {
+        log.debug("Global 处理方法: {}.{}",
+                point.getTarget().getClass().getName(), ((MethodSignature) point.getSignature()).getMethod().getName());
         if (!controllerLogEnabled) {
             return point.proceed();
         }
@@ -51,6 +51,7 @@ public class GlobalLogAspect {
         MethodSignature methodSignature = (MethodSignature) point.getSignature();
         Method method = methodSignature.getMethod();
         if (method.isAnnotationPresent(LogOperation.class)) {
+            log.debug("该方法{} 没有注解", method.getName());
             return point.proceed();
         }
         // 获取当前请求
@@ -59,21 +60,36 @@ public class GlobalLogAspect {
             return point.proceed();
         }
 
-        HttpServletRequest request = attributes.getRequest();
-
 
         // 获取或创建日志信息
         LogInfo logInfo = LogUtil.getLogInfo();
-        logInfo.setLogType(LogType.OPERATION.name());
+        enrichLogInfo(point, method, logInfo);
+        try {
+            // 执行目标方法
+            Object result = point.proceed();
+            // 记录响应结果
+            recordResponseData(result, logInfo);
+            logInfo.finish();
+            return result;
+        } catch (Exception e) {
+            // 记录异常信息
+            logInfo.setLogType(LogType.ERROR.name());
+            logInfo.setException(e.getMessage());
+            logInfo.finish();
+            throw e;
+        }
+    }
+
+
+    private void enrichLogInfo(ProceedingJoinPoint point, Method method, LogInfo logInfo) {
         logInfo.setClassName(point.getTarget().getClass().getName());
         logInfo.setMethodName(method.getName());
-        logInfo.setCreatedAt(LocalDateTime.now());
 
         // 推断模块和操作
         String className = point.getTarget().getClass().getName();
         String controllerName = className.substring(className.lastIndexOf(".") + 1).replace("Controller", "");
         logInfo.setModule(controllerName);
-        logInfo.setOperation(method.getName());
+        logInfo.setOperation(method.getName() + " [Global]");
         // 记录方法参数
         try {
             logInfo.setRequestParams(objectMapper.writeValueAsString(point.getArgs()));
@@ -81,54 +97,23 @@ public class GlobalLogAspect {
             logInfo.setRequestParams(Arrays.toString(point.getArgs()));
         }
 
-        try {
-            // 执行目标方法
-            Object result = point.proceed();
-            if (result != null) {
-                try {
-                    String responseStr = objectMapper.writeValueAsString(result);
-                    // 如果响应数据太大，可以截断
-                    if (responseStr.length() > 10000) {
-                        responseStr = responseStr.substring(0, 10000) + "...(truncated)";
-                    }
-                    logInfo.setResponseData(responseStr);
-                } catch (Exception e) {
-                    logInfo.setResponseData("Failed to serialize response " + e.getMessage());
+    }
+
+    /**
+     * 记录响应数据
+     */
+    private void recordResponseData(Object result, LogInfo logInfo) {
+        if (result != null) {
+            try {
+                String responseStr = objectMapper.writeValueAsString(result);
+                // 如果响应数据太大，可以截断
+                if (responseStr.length() > 10000) {
+                    responseStr = responseStr.substring(0, 10000) + "...(truncated)";
                 }
-            }
-            // 记录日志时间信息
-            logInfo.finish();
-
-            // 记录日志
-            LogUtil.logInfo(logInfo);
-
-            // 保存到数据库
-            try {
-                logService.saveLog(logInfo);
+                logInfo.setResponseData(responseStr);
             } catch (Exception e) {
-                log.error("保存日志到数据库失败", e);
+                logInfo.setResponseData("Failed to serialize response " + e.getMessage());
             }
-
-            return result;
-        } catch (Throwable e) {
-            // 记录异常信息
-            logInfo.setLogType(LogType.ERROR.name());
-            logInfo.setException(e.getMessage());
-            logInfo.finish();
-
-            // 记录到日志文件
-            LogUtil.logError("方法执行异常", e);
-
-            // 保存到数据库
-            try {
-                logService.saveLog(logInfo);
-            } catch (Exception ex) {
-                log.error("保存日志到数据库失败", ex);
-            }
-
-            throw e;
-        } finally {
-            LogUtil.clearLogInfo();
         }
     }
 }

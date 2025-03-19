@@ -9,34 +9,77 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
-import java.time.format.DateTimeFormatter;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.UUID;
 
+/**
+ * 日志工具类，用于管理日志上下文
+ */
 public class LogUtil {
     private static final Logger log = LoggerFactory.getLogger(LogUtil.class);
     private static final ObjectMapper objectMapper = new ObjectMapper();
 
     private static final ThreadLocal<LogInfo> logInfoThreadLocal = new ThreadLocal<>();
+    private static final ThreadLocal<Boolean> logCommitedThreadLocal = new ThreadLocal<>();
 
-    // 获取当前线程的日志信息
+    /**
+     * 为当前线程初始化日志上下文
+     *
+     * @return 新创建的日志信息对象
+     */
+    public static LogInfo initLogContext() {
+        LogInfo currentThreadLogInfo = new LogInfo();
+        currentThreadLogInfo.setRequestId(UUID.randomUUID().toString().replace("-", ""));
+        logInfoThreadLocal.set(currentThreadLogInfo);
+        // 设置日志未提交表示
+        logCommitedThreadLocal.set(false);
+        log.debug("初始化日志上下文: {}", currentThreadLogInfo.getRequestId());
+        return currentThreadLogInfo;
+    }
+
+    /**
+     * 获取当前线程的日志信息
+     *
+     * @return 当前线程的日志信息，如果没有就创建新的
+     */
     public static LogInfo getLogInfo() {
         LogInfo logInfo = logInfoThreadLocal.get();
         if (logInfo == null) {
-            logInfo = new LogInfo();
-            logInfo.setRequestId(UUID.randomUUID().toString().replace("-", ""));
-            logInfoThreadLocal.set(logInfo);
+            logInfo = initLogContext();
         }
         return logInfo;
     }
 
-    // 清除当前线程的日志信息
-    public static void clearLogInfo() {
-        logInfoThreadLocal.remove();
+    /**
+     * 标记当前现成的日志为已记录状态
+     */
+    public static void markAsCommitted() {
+        logCommitedThreadLocal.set(true);
     }
 
-    // 获取当前请求
+    /**
+     * 检查当前线程的日志是否记录
+     *
+     * @return 是否已记录
+     */
+    public static boolean isCommitted() {
+        Boolean committed = logCommitedThreadLocal.get();
+        return committed != null && committed;
+    }
+
+    /**
+     * 清理当前线程的日志上下文
+     */
+    public static void clearLogContext() {
+        log.debug("清理日志上下文");
+        logInfoThreadLocal.remove();
+        logCommitedThreadLocal.remove();
+    }
+
+    /**
+     * 获取当前请求
+     *
+     * @return 请求
+     */
     public static HttpServletRequest getRequest() {
         try {
             ServletRequestAttributes attributes = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
@@ -72,47 +115,31 @@ public class LogUtil {
         return ip;
     }
 
-    // 记录日志信息
+    /**
+     * 记录普通信息
+     *
+     * @param logInfo 日志信息
+     */
     public static void logInfo(LogInfo logInfo) {
-        try {
-            // 创建一个不包含LocalDateTime的简单Map
-            Map<String, Object> logMap = new HashMap<>();
-            logMap.put("requestId", logInfo.getRequestId());
-            logMap.put("logType", logInfo.getLogType());
-            logMap.put("requestUrl", logInfo.getRequestUrl());
-            logMap.put("requestMethod", logInfo.getRequestMethod());
-            logMap.put("module", logInfo.getModule());
-            logMap.put("operation", logInfo.getOperation());
-            logMap.put("className", logInfo.getClassName());
-            logMap.put("methodName", logInfo.getMethodName());
-            logMap.put("requestParams", logInfo.getRequestParams());
-            logMap.put("responseData", logInfo.getResponseData());
-            logMap.put("responseCode", logInfo.getResponseCode());
-            logMap.put("userId", logInfo.getUserId());
-            logMap.put("username", logInfo.getUsername());
-            logMap.put("userAgent", logInfo.getUserAgent());
-            logMap.put("ipAddress", logInfo.getIpAddress());
-            logMap.put("startTime", logInfo.getStartTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-            logMap.put("endTime", logInfo.getEndTime().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-            logMap.put("executionTime", logInfo.getExecutionTime());
-            logMap.put("exception", logInfo.getException());
-            logMap.put("deviceInfo", logInfo.getDeviceInfo());
-            if (logInfo.getCreatedAt() != null) {
-                logMap.put("createdAt", logInfo.getCreatedAt().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME));
-            }
-            log.info("【操作日志】{}", objectMapper.writeValueAsString(logMap));
-        } catch (Exception e) {
-            log.error("日志序列化失败", e);
+        if (logInfo != null) {
+            log.info("操作日志: type={}, module={}, operation={}, time={}ms",
+                    logInfo.getLogType(), logInfo.getModule(), logInfo.getOperation(), logInfo.getExecutionTime());
         }
     }
 
-    // 记录异常日志
+    /**
+     * 记录错误信息
+     *
+     * @param message 错误信息
+     * @param ex      异常
+     */
     public static void logError(String message, Throwable ex) {
-        LogInfo logInfo = getLogInfo();
-        logInfo.setException(ex.getMessage());
-        logInfo.finish();
-
-        log.error("【错误日志】{}", message, ex);
-        logInfo(logInfo);
+        LogInfo logInfo = logInfoThreadLocal.get();
+        if (logInfo != null) {
+            log.error("错误日志: requestId={}, module={}, operation={}, message={}",
+                    logInfo.getRequestId(), logInfo.getModule(), logInfo.getOperation(), message, ex);
+        } else {
+            log.error(message, ex);
+        }
     }
 }

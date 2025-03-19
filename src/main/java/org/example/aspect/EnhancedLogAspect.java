@@ -9,6 +9,7 @@ import org.aspectj.lang.annotation.Pointcut;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.example.annotation.LogOperation;
 import org.example.entity.LogInfo;
+import org.example.entity.LogType;
 import org.example.sevice.LogService;
 import org.example.utils.LogUtil;
 import org.slf4j.Logger;
@@ -18,7 +19,6 @@ import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.lang.reflect.Method;
-import java.time.LocalDateTime;
 import java.util.Arrays;
 
 @Aspect
@@ -40,6 +40,8 @@ public class EnhancedLogAspect {
 
     @Around("logOperationPointcut()")
     public Object around(ProceedingJoinPoint point) throws Throwable {
+        log.debug("EnhancedLogAspect 处理方法: {}.{}",
+                point.getTarget().getClass().getName(), ((MethodSignature) point.getSignature()).getMethod().getName());
         if (!operationLogEnabled) {
             return point.proceed();
         }
@@ -48,19 +50,72 @@ public class EnhancedLogAspect {
 
         // 获取注解信息
         LogOperation logOperation = method.getAnnotation(LogOperation.class);
+        log.debug("方法上的LogOperation 注解: {}", logOperation);
         if (logOperation == null) {
+            log.warn("方法 {}.{} 触发了EnhancedLogAspect 但没有注解", point.getTarget().getClass().getName(), method.getName());
             return point.proceed();
         }
 
         // 获取或创建日志信息
         LogInfo logInfo = LogUtil.getLogInfo();
+        enrichLogInfo(point, method, logOperation, logInfo);
+
+        try {
+            // 执行目标方法
+            Object result = point.proceed();
+            // 记录响应结果
+            if (logOperation.logResult()) {
+                recordResponseData(result, logInfo);
+            }
+            // 完成日志记录（但不保存，由过滤器同意保存）
+            logInfo.finish();
+            // 如果这是一个单独的操作（不是在请求上下文中），则立即保存日志
+            if (shouldSaveImmediately(point)) {
+                LogUtil.logInfo(logInfo);
+                logService.saveLog(logInfo);
+                LogUtil.markAsCommitted();
+            }
+            return result;
+        } catch (Throwable e) {
+            // 记录异常信息
+            logInfo.setLogType(LogType.ERROR.name());
+            logInfo.setException(e.getMessage());
+            logInfo.finish();
+            if (shouldSaveImmediately(point)) {
+                LogUtil.logError("增强日志方法执行异常", e);
+                logService.saveLog(logInfo);
+                LogUtil.markAsCommitted();
+            }
+            throw e;
+        }
+    }
+
+    /**
+     * 是否应该立即保存日志
+     *
+     * @param point
+     * @return
+     */
+    private boolean shouldSaveImmediately(ProceedingJoinPoint point) {
+        // 如果是在定时任务、消息监听器等非Web请求上下文中执行的方法，则立即保存
+        // 这里使用简单的判断：如果类不在controller、service包下，可能是独立操作
+        String className = point.getTarget().getClass().getName();
+        return !className.startsWith("org.example.controller.") && !className.startsWith("org.example.service.");
+    }
+
+    /**
+     * 丰富日志信息
+     *
+     * @param point
+     * @param method
+     * @param logOperation
+     * @param logInfo
+     */
+    private void enrichLogInfo(ProceedingJoinPoint point, Method method, LogOperation logOperation, LogInfo logInfo) {
         logInfo.setModule(logOperation.module());
-        logInfo.setOperation(logOperation.value());
+        logInfo.setOperation(logOperation.value() + " [Enhanced]");
         logInfo.setClassName(point.getTarget().getClass().getName());
         logInfo.setMethodName(method.getName());
-        logInfo.setCreatedAt(LocalDateTime.now());
-
-        // 是否记录请求参数
         if (logOperation.logParams()) {
             try {
                 logInfo.setRequestParams(objectMapper.writeValueAsString(point.getArgs()));
@@ -68,54 +123,20 @@ public class EnhancedLogAspect {
                 logInfo.setRequestParams(Arrays.toString(point.getArgs()));
             }
         }
+    }
 
-        try {
-            // 执行目标方法
-            Object result = point.proceed();
-
-            // 是否记录响应结果
-            if (logOperation.logResult() && result != null) {
-                try {
-                    String responseStr = objectMapper.writeValueAsString(result);
-                    // 如果响应数据太大，可以截断
-                    if (responseStr.length() > 10000) {
-                        responseStr = responseStr.substring(0, 10000) + "...(truncated)";
-                    }
-                    logInfo.setResponseData(responseStr);
-                } catch (Exception e) {
-                    logInfo.setResponseData("Failed to serialize response: " + e.getMessage());
-                }
-            }
-
-            // 记录日志时间信息
-            logInfo.finish();
-
-            // 简化模式下，由GlobalLogAspect负责记录日志
-            // 如果没有GlobalLogAspect，则在这里记录
-            if (!logInfo.getClassName().startsWith("org.example.controller")) {
-                LogUtil.logInfo(logInfo);
-                try {
-                    logService.saveLog(logInfo);
-                } catch (Exception e) {
-                    log.error("保存日志到数据库失败", e);
-                }
-            }
-
-            return result;
-        } catch (Throwable e) {
-            // 记录异常信息
-            logInfo.setException(e.getMessage());
-            logInfo.finish();
-            // 记录到日志文件
-            LogUtil.logError("增强日志方法执行异常", e);
+    private void recordResponseData(Object result, LogInfo logInfo) {
+        if (result != null) {
             try {
-                logService.saveLog(logInfo);
-            } catch (Exception e2) {
-                log.error("保存日志到数据库失败", e2);
+                String responseStr = objectMapper.writeValueAsString(result);
+                if (responseStr.length() > 10000) {
+                    responseStr = responseStr.substring(0, 10000) + "...(truncated)";
+                }
+                logInfo.setResponseData(responseStr);
+            } catch (Exception e) {
+                logInfo.setResponseData("Failed to serialize response" + e.getMessage());
             }
-            throw e;
-        } finally {
-            LogUtil.clearLogInfo();
         }
     }
+
 }

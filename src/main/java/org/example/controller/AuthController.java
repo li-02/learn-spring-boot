@@ -1,7 +1,6 @@
 package org.example.controller;
 
 import jakarta.validation.constraints.Pattern;
-import org.example.annotation.LogOperation;
 import org.example.common.Result;
 import org.example.dto.request.LoginForm;
 import org.example.dto.response.LoginResponse;
@@ -46,7 +45,6 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    @LogOperation(value = "用户登陆", module = "用户登录")
     public Result login(@RequestBody LoginForm loginForm) {
         String username = loginForm.getUsername();
         String password = loginForm.getPassword();

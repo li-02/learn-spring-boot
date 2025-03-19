@@ -7,28 +7,34 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.example.entity.LogInfo;
+import org.example.entity.LogType;
+import org.example.sevice.LogService;
 import org.example.utils.LogUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StopWatch;
 import org.springframework.web.filter.OncePerRequestFilter;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
 
 // order 最高级别：会在其他过滤器之前执行
 
 /**
  * OncePerRequestFileter是Spring提供的一个抽象类，用于确保每个请求只被过滤一次
+ * 日志过滤器，用于初始化和保存请求日志
  */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @Data
 @Slf4j
 public class RequestLoggingFilter extends OncePerRequestFilter {
+    private static final Logger logger = LoggerFactory.getLogger(RequestLoggingFilter.class);
+    private final LogService logService;
     private boolean logRequestParams = true;
     private boolean logResponseBody = true;
     private int maxPayloadLength = 10000;
@@ -61,42 +67,55 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         ContentCachingResponseWrapper responseWrapper = new ContentCachingResponseWrapper(response);
 
         // 初始化日志信息
-        LogInfo logInfo = LogUtil.getLogInfo();
-        StopWatch stopWatch = new StopWatch();
-        stopWatch.start();
+        LogInfo logInfo = LogUtil.initLogContext();
+        logInfo.setLogType(LogType.OPERATION.name());
+        logInfo.setCreatedAt(LocalDateTime.now());
+        // 记录请求信息
+        logInfo.setRequestUrl(requestWrapper.getRequestURL().toString());
+        logInfo.setRequestMethod(requestWrapper.getMethod());
 
         try {
-            // 执行请求
+            // 继续执行过滤器链
             filterChain.doFilter(requestWrapper, responseWrapper);
         } finally {
-            stopWatch.stop();
-            // 请求完成后，记录请求和响应信息
-            if (logRequestParams && requestWrapper.getContentAsByteArray().length > 0) {
-                String requestBody = new String(requestWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
-                if (requestBody.length() > maxPayloadLength) {
-                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
-                }
-                logInfo.setRequestParams(requestBody);
-            }
-            if (logResponseBody && responseWrapper.getContentAsByteArray().length > 0) {
-                String requestBody = new String(responseWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
-                if (requestBody.length() > maxPayloadLength) {
-                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
-                }
-                logInfo.setResponseData(requestBody);
-            }
+//            // 请求完成后，记录请求和响应信息
+//            if (logRequestParams && requestWrapper.getContentAsByteArray().length > 0) {
+//                String requestBody = new String(requestWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
+//                if (requestBody.length() > maxPayloadLength) {
+//                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
+//                }
+//                logInfo.setRequestParams(requestBody);
+//            }
+//            if (logResponseBody && responseWrapper.getContentAsByteArray().length > 0) {
+//                String requestBody = new String(responseWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
+//                if (requestBody.length() > maxPayloadLength) {
+//                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
+//                }
+//                logInfo.setResponseData(requestBody);
+//            }
             // 复制响应内容（重要步骤！） 确保相应内容被写入到响应中
             responseWrapper.copyBodyToResponse();
 
-            // 这里我们不记录日志，因为后续的AOP切面会处理，除非没有匹配的切面
-            // 没有后续切面处理（比如静态资源请求），就在这里记录日志
-            String uri = request.getRequestURI();
-            if (isAssetRequest(uri)) {
-                if (log.isDebugEnabled()) {
-                    log.debug("Static resource request: {}", uri);
-                }
-                LogUtil.clearLogInfo();
+            // 请求结束时，如果日志未被提交，则保存默认日志
+            if (!LogUtil.isCommitted()) {
+                logInfo.finish();
+                tryToSaveLog(logInfo);
             }
+            // 清理日志上下文
+            LogUtil.clearLogContext();
+        }
+    }
+
+    private void tryToSaveLog(LogInfo logInfo) {
+        try {
+            // 记录到日志文件
+            LogUtil.logInfo(logInfo);
+            // 保存到数据库
+            logService.saveLog(logInfo);
+            // 标记为已提交
+            LogUtil.markAsCommitted();
+        } catch (Exception e) {
+            log.error("保存日志到数据库失败", e);
         }
     }
 
