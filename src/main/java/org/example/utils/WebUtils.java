@@ -59,19 +59,65 @@ public class WebUtils {
     }
 
     /**
-     * 获取设备信息
-     */
-    public static String getDeviceInfo() {
-        return getUserAgent(); // 简单实现，实际可以解析User-Agent获取更详细的设备信息
-    }
-
-    /**
      * 判断是否是AJAX请求
      */
     public static boolean isAjaxRequest() {
         return getRequest()
                 .map(request -> "XMLHttpRequest".equals(request.getHeader("X-Requested-With")))
                 .orElse(false);
+    }
+
+    /**
+     * 获取设备信息
+     *
+     * @return 设备信息字符串
+     */
+    public static String getDeviceInfo() {
+        HttpServletRequest request = LogUtil.getRequest();
+        if (request == null) {
+            return "unknown";
+        }
+
+        String userAgent = request.getHeader("User-Agent");
+        if (userAgent == null) {
+            return "unknown";
+        }
+
+        StringBuilder deviceInfo = new StringBuilder();
+
+        // 检测操作系统
+        if (userAgent.contains("Windows")) {
+            deviceInfo.append("Windows");
+        } else if (userAgent.contains("Mac")) {
+            deviceInfo.append("MacOS");
+        } else if (userAgent.contains("Linux")) {
+            deviceInfo.append("Linux");
+        } else if (userAgent.contains("Android")) {
+            deviceInfo.append("Android");
+        } else if (userAgent.contains("iPhone") || userAgent.contains("iPad")) {
+            deviceInfo.append("iOS");
+        } else {
+            deviceInfo.append("Other OS");
+        }
+
+        deviceInfo.append(" | ");
+
+        // 检测浏览器
+        if (userAgent.contains("Chrome") && !userAgent.contains("Edg")) {
+            deviceInfo.append("Chrome");
+        } else if (userAgent.contains("Firefox")) {
+            deviceInfo.append("Firefox");
+        } else if (userAgent.contains("Safari") && !userAgent.contains("Chrome")) {
+            deviceInfo.append("Safari");
+        } else if (userAgent.contains("Edg")) {
+            deviceInfo.append("Edge");
+        } else if (userAgent.contains("MSIE") || userAgent.contains("Trident")) {
+            deviceInfo.append("Internet Explorer");
+        } else {
+            deviceInfo.append("Other Browser");
+        }
+
+        return deviceInfo.toString();
     }
 
 }

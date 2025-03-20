@@ -42,8 +42,6 @@ public class GlobalLogAspect {
 
     @Around("controllerPointcut()")
     public Object around(ProceedingJoinPoint point) throws Throwable {
-        log.debug("Global 处理方法: {}.{}",
-                point.getTarget().getClass().getName(), ((MethodSignature) point.getSignature()).getMethod().getName());
         if (!controllerLogEnabled) {
             return point.proceed();
         }
@@ -51,7 +49,6 @@ public class GlobalLogAspect {
         MethodSignature methodSignature = (MethodSignature) point.getSignature();
         Method method = methodSignature.getMethod();
         if (method.isAnnotationPresent(LogOperation.class)) {
-            log.debug("该方法{} 没有注解", method.getName());
             return point.proceed();
         }
         // 获取当前请求

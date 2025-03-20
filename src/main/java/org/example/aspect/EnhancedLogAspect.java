@@ -40,8 +40,6 @@ public class EnhancedLogAspect {
 
     @Around("logOperationPointcut()")
     public Object around(ProceedingJoinPoint point) throws Throwable {
-        log.debug("EnhancedLogAspect 处理方法: {}.{}",
-                point.getTarget().getClass().getName(), ((MethodSignature) point.getSignature()).getMethod().getName());
         if (!operationLogEnabled) {
             return point.proceed();
         }
@@ -50,9 +48,7 @@ public class EnhancedLogAspect {
 
         // 获取注解信息
         LogOperation logOperation = method.getAnnotation(LogOperation.class);
-        log.debug("方法上的LogOperation 注解: {}", logOperation);
         if (logOperation == null) {
-            log.warn("方法 {}.{} 触发了EnhancedLogAspect 但没有注解", point.getTarget().getClass().getName(), method.getName());
             return point.proceed();
         }
 

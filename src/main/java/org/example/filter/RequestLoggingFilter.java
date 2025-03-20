@@ -10,6 +10,7 @@ import org.example.entity.LogInfo;
 import org.example.entity.LogType;
 import org.example.sevice.LogService;
 import org.example.utils.LogUtil;
+import org.example.utils.WebUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.Ordered;
@@ -73,26 +74,16 @@ public class RequestLoggingFilter extends OncePerRequestFilter {
         // 记录请求信息
         logInfo.setRequestUrl(requestWrapper.getRequestURL().toString());
         logInfo.setRequestMethod(requestWrapper.getMethod());
+        // 添加IP地址和用户代理信息
+        logInfo.setIpAddress(WebUtils.getClientIp());
+        logInfo.setUserAgent(requestWrapper.getHeader("User-Agent"));
 
         try {
             // 继续执行过滤器链
             filterChain.doFilter(requestWrapper, responseWrapper);
+            // 记录响应码
+            logInfo.setResponseCode(String.valueOf(responseWrapper.getStatus()));
         } finally {
-//            // 请求完成后，记录请求和响应信息
-//            if (logRequestParams && requestWrapper.getContentAsByteArray().length > 0) {
-//                String requestBody = new String(requestWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
-//                if (requestBody.length() > maxPayloadLength) {
-//                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
-//                }
-//                logInfo.setRequestParams(requestBody);
-//            }
-//            if (logResponseBody && responseWrapper.getContentAsByteArray().length > 0) {
-//                String requestBody = new String(responseWrapper.getContentAsByteArray(), StandardCharsets.UTF_8);
-//                if (requestBody.length() > maxPayloadLength) {
-//                    requestBody = requestBody.substring(0, maxPayloadLength) + "...(truncated)";
-//                }
-//                logInfo.setResponseData(requestBody);
-//            }
             // 复制响应内容（重要步骤！） 确保相应内容被写入到响应中
             responseWrapper.copyBodyToResponse();
 

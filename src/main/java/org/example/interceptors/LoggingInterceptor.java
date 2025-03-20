@@ -6,6 +6,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import org.example.entity.LogInfo;
 import org.example.utils.LogUtil;
 import org.example.utils.ThreadLocalUtil;
+import org.example.utils.WebUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -32,12 +33,16 @@ public class LoggingInterceptor implements HandlerInterceptor {
             logInfo.setClassName(handlerMethod.getBeanType().getName());
             logInfo.setMethodName(handlerMethod.getMethod().getName());
 
+            // 补充设备信息
+            logInfo.setDeviceInfo(WebUtils.getDeviceInfo());
             // 尝试获取当前登录用户
             try {
                 Map<String, Object> claims = ThreadLocalUtil.get();
-                if (claims != null && claims.containsKey("username")) {
+                if (claims != null && claims.containsKey("username") && claims.containsKey("id")) {
                     String username = (String) claims.get("username");
+                    Integer id = (Integer) claims.get("id");
                     logInfo.setUsername(username);
+                    logInfo.setUserId(Long.valueOf(id));
                 } else {
                     logInfo.setUsername("anonymous");
                 }
